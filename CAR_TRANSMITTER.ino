@@ -11,10 +11,19 @@
 #include <FS.h>
 
 
+FirebaseData firebaseData;
+AsyncWebServer server(80);
+Preferences preferences;
 TaskHandle_t Task2;
 SemaphoreHandle_t variableMutex;
 
 void setup() {
+  Serial.begin(115200);
+  
+
+
+
+  connectWiFi();
   
   variableMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(
@@ -26,16 +35,38 @@ void setup() {
     &Task2,
     1);
   delay(500);
-
 }
 
+//////////////////////////////////////////////////////
+void connectWiFi() {
+  WiFiManager wm;
+  WiFi.disconnect();
+  delay(50);
+  bool success = false;
+  while (!success) {
+    wm.setConfigPortalTimeout(60);
+    success = wm.autoConnect("TRANSMITTER");
+    if (!success) {
+      Serial.println("TRANSMITTER");
+      Serial.println("Setup IP - 192.168.4.1");
+      Serial.println("Conection Failed!");
+    }
+  }
+
+  Serial.print("Connected SSID - ");
+  Serial.println(WiFi.SSID());
+  Serial.print("IP Address is : ");
+  Serial.println(WiFi.localIP());
+  delay(3000);
+}
+//////////////////////////////////////////////////////
 void loop2(void * parameter) {
   for (;;) {
 
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
-
+//////////////////////////////////////////////////////
 void loop() {
   
 }

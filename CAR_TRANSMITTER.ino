@@ -10,6 +10,7 @@
 #include "SPIFFS.h"
 #include <FS.h>
 
+
 #define DATA_PIN 12
 #define NUM_LEDS 1
 #define CHIPSET WS2812
@@ -18,14 +19,17 @@
 #define STATUS_LED 0
 #define BOOT_BUTTON_PIN 0
 
+
 CRGB leds[NUM_LEDS];
 
 
+#define THROTTLE 34
+#define FORWARD 16
+#define BACKWARD 17
+#define LEFT 18
+#define RIGHT 19
+#define HORN 4
 
-#define SWITCH1 16
-#define SWITCH2 17
-#define SWITCH3 18
-#define SWITCH4 19
 
 
 unsigned long previousMillis = 0;
@@ -33,10 +37,11 @@ const unsigned long interval = 50;
 
 const int portalOpenTime = 300000; //server open for 5 mins
 bool onDemand;
-uint8_t batteryLevel;
+
 
 String firebaseStatus = "";
-
+volatile uint8_t sharedVarForSpeed;
+volatile uint16_t sharedVarForTime = 0;
 
 
 
@@ -45,20 +50,31 @@ const char* switch2;
 const char* switch3;
 const char* switch4;
 
-unsigned int s1;
-unsigned int s2;
-unsigned int s3;
-unsigned int s4;
+uint8_t batteryLevel;
+uint8_t throttleValue;
+uint8_t forwardValue;
+uint8_t backwardValue;
+uint8_t leftValue;
+uint8_t rightValue;
+uint8_t hornValue;
 
 FirebaseData firebaseData;
 AsyncWebServer server(80);
 Preferences preferences;
+
 TaskHandle_t Task1;
 SemaphoreHandle_t variableMutex;
 
 void setup() {
   Serial.begin(115200);
 
+  pinMode(BOOT_BUTTON_PIN, INPUT);
+  pinMode(THROTTLE, INPUT);
+  pinMode(FORWARD, INPUT);
+  pinMode(BACKWARD, INPUT);
+  pinMode(LEFT, INPUT);
+  pinMode(RIGHT, INPUT);
+  pinMode(HORN, INPUT);
 
 
   if (!SPIFFS.begin(true)) {
@@ -66,11 +82,6 @@ void setup() {
     return;
   }
 
-  pinMode(BOOT_BUTTON_PIN, INPUT);
-  pinMode(SWITCH1, OUTPUT);
-  pinMode(SWITCH2, OUTPUT);
-  pinMode(SWITCH3, OUTPUT);
-  pinMode(SWITCH4, OUTPUT);
   FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 500);
   FastLED.setBrightness(BRIGHTNESS);
@@ -231,8 +242,9 @@ void decodeData(String data) {
     return;
   }
 
-  batteryLevel = doc["BATTERY"]; // "110"
-  Serial.println(batteryLevel);
+  batteryLevel = doc["BATTERY"];
+  throttleValue = doc["SPEED"];
+  //  Serial.println(batteryLevel);
 
 
 }
@@ -297,8 +309,76 @@ void loading()
   }
 }
 
+void navigation() {
+  uint8_t f = digitalRead(FORWARD);
+  uint8_t b = digitalRead(BACKWARD);
+  uint8_t l = digitalRead(LEFT);
+  uint8_t r = digitalRead(RIGHT);
+  uint8_t h = digitalRead(HORN);
 
+  if (f == HIGH && b == LOW && l == LOW && r == LOW) {
+    Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 1);
+  } else {
+    Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 0);
+  }
 
+  if (b == HIGH && f == LOW && l == LOW && r == LOW) {
+    Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", 1);
+  } else {
+    Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", 0);
+  }
+
+  if (l == HIGH && f == LOW && b == LOW && r == LOW) {
+    Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", 1);
+  } else {
+    Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", 0);
+  }
+
+  if (r == HIGH && f == LOW && b == LOW && l == LOW) {
+    Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", 1);
+  } else {
+    Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", 0);
+  }
+
+  if (digitalRead(HORN) == HIGH) {
+    Firebase.setInt(firebaseData, "/ESP-CAR/HORN", 1);
+  }
+  else {
+    Firebase.setInt(firebaseData, "/ESP-CAR/HORN", 0);
+  }
+}
+///////////////////////////////////////////////////////////////
+void speedControll() {
+  //  if (xSemaphoreTake(variableMutex, portMAX_DELAY)) {
+  //    sharedVarForSpeed = map(analogRead(THROTTLE), 0, 4095, 0, 255);
+  //    xSemaphoreGive(variableMutex);
+  //  }
+
+  int mappedValue = map(analogRead(THROTTLE), 0, 4095, 0, 255);
+  //  Serial.println(mappedValue);
+  
+  if (abs(throttleValue - mappedValue) > 2) {
+    Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", mappedValue);
+  } 
+}
+/////////////////////////////////////////////////////////////
+void speedUpload() {
+  if (xSemaphoreTake(variableMutex, portMAX_DELAY)) {
+    throttleValue = sharedVarForSpeed;
+    xSemaphoreGive(variableMutex);
+    Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", throttleValue);
+  }
+}
+//////////////////////////////////////////////////////////////
+void updateFirebase() {
+
+  Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", forwardValue);
+  Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", backwardValue);
+  Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", leftValue);
+  Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", rightValue);
+  Firebase.setInt(firebaseData, "/ESP-CAR/HORN", hornValue);
+  Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", throttleValue);
+}
 ///////////////////////////////////////////////////////////////
 void loop1(void * parameter) {
 
@@ -320,32 +400,6 @@ void loop1(void * parameter) {
   }
 }
 
-
-/////////////////////////////////////////////////////////////
-void generateRandom() {
-
-  int backward = random(0, 100);
-  int forward = random(0, 100);
-  int left = random(0, 100);
-  int right = random(0, 100);
-  int speed = random(0, 255);
-  int horn = random(0, 100);
-  int battery = random(0, 100);
-
-
-  Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", backward);
-  Firebase.setInt(firebaseData, "/ESP-CAR/BATTERY", battery);
-  Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", forward);
-  Firebase.setInt(firebaseData, "/ESP-CAR/HORN", horn);
-  Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", left);
-  Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", right);
-  Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", speed);
-
-
-
-}
-
-
 //////////////////////////////////////////////////////////////
 
 void loop() {
@@ -354,17 +408,10 @@ void loop() {
   onDemandFirebaseConfig();
 
   if (firebaseStatus == "ok") {
-
+    navigation();
+    speedControll();
     Firebase.getString(firebaseData, "/ESP-CAR");
     decodeData(firebaseData.stringData());
-
-    //    generateRandom();
-
-
-    //    controlSwitch1(s1);
-    //    controlSwitch2(s2);
-    //    controlSwitch3(s3);
-    //    controlSwitch4(s4);
   }
   else {
     Serial.println("firebase failed");

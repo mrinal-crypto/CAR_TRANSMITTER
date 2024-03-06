@@ -1,7 +1,10 @@
 #include <Arduino.h>
-#include <WiFi.h> //works for only esp32
-#include <WiFiManager.h> //works for only esp32
-#include <FirebaseESP8266.h> //works for both esp32 and esp8266
+#include <SPI.h>
+#include <Wire.h>
+#include <WiFi.h>
+#include <U8g2lib.h>
+#include <WiFiManager.h>
+#include <FirebaseESP8266.h>
 #include <ArduinoJson.h>
 #include <FastLED.h>
 #include <ESPAsyncWebServer.h>
@@ -10,18 +13,13 @@
 #include "SPIFFS.h"
 #include <FS.h>
 
-
-#define DATA_PIN 12
+#define DATA_PIN 32
 #define NUM_LEDS 1
 #define CHIPSET WS2812
 #define BRIGHTNESS 50
 #define COLOR_ORDER GRB
 #define STATUS_LED 0
 #define BOOT_BUTTON_PIN 0
-
-
-CRGB leds[NUM_LEDS];
-
 
 #define THROTTLE 34
 #define FORWARD 16
@@ -30,6 +28,8 @@ CRGB leds[NUM_LEDS];
 #define RIGHT 19
 #define HORN 4
 
+CRGB leds[NUM_LEDS];
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
 
 unsigned long previousMillis = 0;
@@ -67,6 +67,12 @@ SemaphoreHandle_t variableMutex;
 
 void setup() {
   Serial.begin(115200);
+  u8g2.begin();
+  delay(100);
+  welcomeMsg();
+  delay(3000);
+  u8g2.clearDisplay();
+
 
   pinMode(BOOT_BUTTON_PIN, INPUT);
   pinMode(THROTTLE, INPUT);
@@ -75,18 +81,26 @@ void setup() {
   pinMode(LEFT, INPUT);
   pinMode(RIGHT, INPUT);
   pinMode(HORN, INPUT);
+  delay(500);
 
-
-  if (!SPIFFS.begin(true)) {
-    Serial.println("An error occurred while mounting SPIFFS");
-    return;
+  if (SPIFFS.begin(true)) {
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(0, 9, "filesystem = ok!");
+    u8g2.sendBuffer();
   }
+  if (!SPIFFS.begin(true)){
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(0, 9, "filesystem = error!");
+    u8g2.sendBuffer();
+  }
+  delay(1000);
 
   FastLED.addLeds<CHIPSET, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 500);
   FastLED.setBrightness(BRIGHTNESS);
   FastLED.clear();
   FastLED.show();
+  delay(500);
 
 
   connectWiFi();
@@ -103,8 +117,28 @@ void setup() {
     1);
   delay(500);
 }
+////////////////////////////////////////////////////////////////////////
+void welcomeMsg() {
 
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_luBIS18_tr);
+  u8g2.drawStr(7, 35, "ESP CAR");
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(2, 60, "developed by M.Maity");
+  u8g2.sendBuffer();
+  u8g2.clearBuffer();
 
+}
+////////////////////////////////////////////////////////////////////////
+void clearLCD(const long x, uint8_t y, uint8_t wid, uint8_t hig) {
+  /*  this wid is right x, this height is below y
+      where font wid is right x, font height is upper y
+  */
+  u8g2.setDrawColor(0);
+  u8g2.drawBox(x, y, wid, hig);
+  u8g2.setDrawColor(1);
+}
+/////////////////////////////////////////////////////////////////////////
 void connectFirebase() {
   preferences.begin("my-app", false);
 
@@ -356,10 +390,10 @@ void speedControll() {
 
   int mappedValue = map(analogRead(THROTTLE), 0, 4095, 0, 255);
   //  Serial.println(mappedValue);
-  
+
   if (abs(throttleValue - mappedValue) > 2) {
     Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", mappedValue);
-  } 
+  }
 }
 /////////////////////////////////////////////////////////////
 void speedUpload() {

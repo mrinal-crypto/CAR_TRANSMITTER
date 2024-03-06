@@ -40,6 +40,7 @@ bool onDemand;
 
 
 String firebaseStatus = "";
+String ssid = "";
 volatile uint8_t sharedVarForSpeed;
 volatile uint16_t sharedVarForTime = 0;
 
@@ -50,6 +51,13 @@ const char* switch2;
 const char* switch3;
 const char* switch4;
 
+int signalQuality[] = {99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+                       99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 98, 98, 98, 97, 97, 96, 96, 95, 95, 94, 93, 93, 92,
+                       91, 90, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80, 79, 78, 76, 75, 74, 73, 71, 70, 69, 67, 66, 64,
+                       63, 61, 60, 58, 56, 55, 53, 51, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20,
+                       17, 15, 13, 10, 8, 6, 3, 1, 1, 1, 1, 1, 1, 1, 1
+                      };
+uint8_t wifiRSSI = 0;
 uint8_t batteryLevel;
 uint8_t throttleValue;
 uint8_t forwardValue;
@@ -85,12 +93,12 @@ void setup() {
 
   if (SPIFFS.begin(true)) {
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(0, 9, "filesystem = ok!");
+    u8g2.drawStr(0, 10, "FILESYSTEM = OK!");
     u8g2.sendBuffer();
   }
-  if (!SPIFFS.begin(true)){
+  if (!SPIFFS.begin(true)) {
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(0, 9, "filesystem = error!");
+    u8g2.drawStr(0, 10, "FILESYSTEM = ERROR!");
     u8g2.sendBuffer();
   }
   delay(1000);
@@ -104,7 +112,10 @@ void setup() {
 
 
   connectWiFi();
+  delay(1000);
   connectFirebase();
+  delay(1000);
+  //  u8g2.clearDisplay();
 
   variableMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(
@@ -145,6 +156,12 @@ void connectFirebase() {
   if (preferences.getString("firebaseUrl", "") != "" && preferences.getString("firebaseToken", "") != "") {
     Serial.println("Firebase settings already exist. Checking Firebase connection...");
 
+    clearLCD(0, 40, 128, 10);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(0, 50, "SECRETS EXIST...");
+    u8g2.sendBuffer();
+    delay(500);
+
     Firebase.begin(preferences.getString("firebaseUrl", ""), preferences.getString("firebaseToken", ""));
     delay(100);
     Firebase.reconnectWiFi(true);
@@ -152,13 +169,28 @@ void connectFirebase() {
 
     if (isFirebaseConnected() == true) {
       Serial.println("Connected to Firebase. Skipping server setup.");
+      clearLCD(0, 50, 128, 10);
+      u8g2.setFont(u8g2_font_t0_11_tr);
+      u8g2.drawStr(0, 60, "SERVER = OK!");
+      u8g2.sendBuffer();
+      delay(500);
       firebaseStatus = "ok";
     } else {
       Serial.println("Failed to connect to Firebase. Starting server setup.");
+      clearLCD(0, 50, 128, 10);
+      u8g2.setFont(u8g2_font_t0_11_tr);
+      u8g2.drawStr(0, 60, "SERVER = ERROR!");
+      u8g2.sendBuffer();
+      delay(1000);
       setupServer();
     }
   } else {
     Serial.println("Firebase settings not found. Starting server setup.");
+    clearLCD(0, 40, 128, 10);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(0, 50, "SECRETS NOT FOUND!");
+    u8g2.sendBuffer();
+    delay(500);
     setupServer();
   }
 
@@ -188,20 +220,33 @@ void setupServer() {
     if (isFirebaseConnected() == true) {
       firebaseStatus = "ok";
       Serial.println("Firebase settings saved");
-      delay(300);
       Serial.println("Success");
-      delay(300);
       Serial.println("Restarting your device...");
+
+      clearLCD(0, 40, 128, 10);
+      u8g2.setFont(u8g2_font_t0_11_tr);
+      u8g2.drawStr(0, 50, "SAVED. SUCCESS!");
       delay(500);
+      clearLCD(0, 50, 128, 10);
+      u8g2.drawStr(0, 60, "RESTARTING...");
+      u8g2.sendBuffer();
+      delay(1000);
       ESP.restart();
     } else {
       firebaseStatus = "";
       Serial.println("Firebase settings saved");
-      delay(300);
       Serial.println("Error! Check your credentials.");
-      delay(300);
       Serial.println("Restarting your device...");
+
+
+      clearLCD(0, 40, 128, 10);
+      u8g2.setFont(u8g2_font_t0_11_tr);
+      u8g2.drawStr(0, 50, "SAVED. FAILED!");
       delay(500);
+      clearLCD(0, 50, 128, 10);
+      u8g2.drawStr(0, 60, "RESTARTING...");
+      u8g2.sendBuffer();
+      delay(1000);
       ESP.restart();
     }
   });
@@ -212,18 +257,53 @@ void setupServer() {
   Serial.println("server begin");
   Serial.println(WiFi.localIP());
 
+  clearLCD(0, 40, 128, 10);
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(0, 50, "SERVER OPEN");
+  clearLCD(0, 50, 128, 10);
+  ipCheck(0, 60);
+  u8g2.sendBuffer();
+  delay(500);
+
   showLedStatus(0, 0, 255);
 
 
   delay(portalOpenTime);
   Serial.println("Restarting your device...");
+
+  clearLCD(0, 50, 128, 10);
+  u8g2.drawStr(0, 60, "RESTARTING...");
+  u8g2.sendBuffer();
   delay(1000);
+
   ESP.restart();
 }
+//////////////////////////////////////////////////////////////////////////////
+void ipCheck(uint8_t ipx, uint8_t ipy) {
 
+  String rawIP = WiFi.localIP().toString(); //toString () used for convert char to string
+
+  String IPAdd = "IP " + rawIP;
+
+  clearLCD(ipx, ipy - 10, 98, 10);
+
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(ipx, ipy, IPAdd.c_str()); //c_str() function used for convert string to const char *
+  u8g2.sendBuffer();
+
+}
+//////////////////////////////////////////////////////////////////////////////
 void connectWiFi() {
 
   WiFiManager wm;
+
+  clearLCD(0, 10, 128, 30);
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(0, 20, "CONNECTING WIFI...");
+  u8g2.drawStr(0, 30, "AP - TRANSMITTER");
+  u8g2.drawStr(0, 40, "IP - 192.168.4.1");
+  u8g2.sendBuffer();
+
   WiFi.disconnect();
   delay(50);
   bool success = false;
@@ -232,6 +312,13 @@ void connectWiFi() {
     wm.setConfigPortalTimeout(60);
     success = wm.autoConnect("TRANSMITTER");
     if (!success) {
+      clearLCD(0, 10, 128, 30);
+      u8g2.setFont(u8g2_font_t0_11_tr);
+      u8g2.drawStr(0, 20, "WIFI SETUP = ERROR!");
+      u8g2.drawStr(0, 30, "AP - TRANSMITTER");
+      u8g2.drawStr(0, 40, "IP - 192.168.4.1");
+      u8g2.sendBuffer();
+
       Serial.println("TRANSMITTER");
       Serial.println("Setup IP - 192.168.4.1");
       Serial.println("Conection Failed!");
@@ -242,11 +329,60 @@ void connectWiFi() {
   Serial.println(WiFi.SSID());
   Serial.print("IP Address is : ");
   Serial.println(WiFi.localIP());
-  delay(3000);
-}
 
+  clearLCD(0, 10, 128, 30);
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(0, 20, "WIFI SETUP = OK!");
+  u8g2.sendBuffer();
+  delay(1000);
+  ssid = WiFi.SSID();
+  u8g2.drawStr(0, 30, ssid.c_str());
+  u8g2.sendBuffer();
+  delay(1000);
+  wifiSignalQuality(100, 30);
+  delay(500);
+  ipCheck(0, 40);
+  delay(500);
+}
+////////////////////////////////////////////////////////////////////////
+void wifiSignalQuality(uint8_t sqx, uint8_t sqy) {
+
+  wifiRSSI = WiFi.RSSI() * (-1);
+  char str[3];
+  char str2[3] = "%";
+
+  tostring(str, signalQuality[wifiRSSI]);
+
+  strcat(str, str2);
+
+  clearLCD(sqx, sqy - 10, 20, 10);
+
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(sqx, sqy, str);
+  u8g2.sendBuffer();
+}
+///////////////////////////////////////////////////////////////////////
+void tostring(char str[], int num) {
+  int i, rem, len = 0, n;
+
+  n = num;
+  while (n != 0)
+  {
+    len++;
+    n /= 10;
+  }
+  for (i = 0; i < len; i++)
+  {
+    rem = num % 10;
+    num = num / 10;
+    str[len - (i + 1)] = rem + '0';
+  }
+  str[len] = '\0';
+}
+////////////////////////////////////////////////////////////////////////
 void onDemandFirebaseConfig() {
   if (digitalRead(BOOT_BUTTON_PIN) == LOW) {
+    u8g2.clearDisplay();
     onDemand = true;
     firebaseStatus = "";
     setupServer();

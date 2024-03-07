@@ -62,11 +62,14 @@ float batteryLevel = 11.2;
 float blc = 11.1;
 float bhc = 12.5;
 uint8_t throttleValue;
+uint8_t potValue;
 uint8_t forwardValue;
 uint8_t backwardValue;
 uint8_t leftValue;
 uint8_t rightValue;
 uint8_t hornValue;
+uint8_t headlightValue;
+uint8_t gpsValue;
 
 FirebaseData firebaseData;
 AsyncWebServer server(80);
@@ -118,6 +121,8 @@ void setup() {
   connectFirebase();
   delay(2000);
   u8g2.clearDisplay();
+  drawLayout();
+  delay(1000);
 
   variableMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(
@@ -414,12 +419,19 @@ void decodeData(String data) {
     return;
   }
 
+  backwardValue = doc["BACKWARD"];
   batteryLevel = doc["BATTERY"];
-  throttleValue = doc["THROTTLE"];
-  blc = doc["BLC"];
   bhc = doc["BHC"];
-  //  Serial.println(batteryLevel);
+  blc = doc["BLC"];
+  forwardValue = doc["FORWARD"];
+  gpsValue = doc["GPS"];
+  headlightValue = doc["HL"];
+  hornValue = doc["HORN"];
+  leftValue = doc["LEFT"];
+  rightValue = doc["RIGHT"];
+  throttleValue = doc["THROTTLE"];
 
+  //  Serial.println(batteryLevel);
 
 }
 
@@ -528,11 +540,9 @@ void speedControll() {
   //    xSemaphoreGive(variableMutex);
   //  }
 
-  int mappedValue = map(analogRead(THROTTLE), 0, 4095, 0, 255);
-  //  Serial.println(mappedValue);
-
-  if (abs(throttleValue - mappedValue) > 2) {
-    Firebase.setInt(firebaseData, "/ESP-CAR/THROTTLE", mappedValue);
+  potValue = map(analogRead(THROTTLE), 0, 4095, 0, 255);
+  if (abs(throttleValue - potValue) > 2) {
+    Firebase.setInt(firebaseData, "/ESP-CAR/THROTTLE", potValue);
   }
 }
 /////////////////////////////////////////////////////////////
@@ -543,15 +553,13 @@ void speedUpload() {
     Firebase.setInt(firebaseData, "/ESP-CAR/THROTTLE", throttleValue);
   }
 }
-//////////////////////////////////////////////////////////////
-void updateFirebase() {
-
-  Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", forwardValue);
-  Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", backwardValue);
-  Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", leftValue);
-  Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", rightValue);
-  Firebase.setInt(firebaseData, "/ESP-CAR/HORN", hornValue);
-  Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", throttleValue);
+///////////////////////////////////////////////////////////////
+void drawLayout() {
+  u8g2.drawFrame(0, 0, 80, 64);
+  u8g2.drawFrame(81, 0, 47, 64);
+  u8g2.drawLine(93, 46, 112, 46);
+  u8g2.drawLine(102, 42, 102, 50);
+  u8g2.sendBuffer();
 }
 ///////////////////////////////////////////////////////////////
 void printSSID(uint8_t ssidx, uint8_t ssidy) {
@@ -582,29 +590,116 @@ void batteryVoltage(uint8_t bvx, uint8_t bvy) {
   u8g2.sendBuffer();
 }
 ///////////////////////////////////////////////////////////////
-void batteryPercent(uint8_t bpx, uint8_t bpy){
-  float batteryFactor = 99/(bhc-blc);
-  int bat = (batteryLevel - blc)*batteryFactor;
+void batteryPercent(uint8_t bpx, uint8_t bpy) {
+  float batteryFactor = 99 / (bhc - blc);
+  int bat = (batteryLevel - blc) * batteryFactor;
   String percentStr = String(bat);
   String percent = percentStr + "%";
   clearLCD(bpx, bpy - 9, 20, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
-  u8g2.drawStr(bpx, bpy, percent.c_str()); //c_str() function used for convert string to const char *
+  u8g2.drawStr(bpx, bpy, percent.c_str());
   u8g2.sendBuffer();
+}
+///////////////////////////////////////////////////////////////
+void displayThrottle(uint8_t tvx, uint8_t tvy) {
+  uint8_t pot = map(analogRead(THROTTLE), 0, 4095, 0, 100);
+  String potStr = String(pot);
+  String potPercent = "T=" + potStr + "%";
+  clearLCD(tvx, tvy - 9, 42, 9);
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(tvx, tvy, potPercent.c_str());
+  u8g2.sendBuffer();
+}
+///////////////////////////////////////////////////////////////
+void displayHorn(uint8_t dhx, uint8_t dhy) {
+  if (hornValue == 1) {
+    clearLCD(dhx, dhy - 9, 14, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dhx, dhy, "HR");
+    u8g2.sendBuffer();
+  } else {
+    clearLCD(dhx, dhy - 9, 14, 9);
+  }
+}
+///////////////////////////////////////////////////////////////
+void displayHeadlight(uint8_t dhdx, uint8_t dhdy) {
+  if (headlightValue == 1) {
+    clearLCD(dhdx, dhdy - 9, 14, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dhdx, dhdy, "HL");
+    u8g2.sendBuffer();
+  } else {
+    clearLCD(dhdx, dhdy - 9, 14, 9);
+  }
+}
+///////////////////////////////////////////////////////////////
+void displayNav(uint8_t dnx, uint8_t dny) {
+  if (forwardValue == 1) {
+    clearLCD(dnx, dny - 9, 5, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dnx, dny, "F");
+    u8g2.sendBuffer();
+  } else {
+    clearLCD(dnx, dny - 9, 6, 9);
+  }
+
+  if (leftValue == 1) {
+    clearLCD(dnx - 15, dny + 10 - 9, 5, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dnx - 15, dny + 10, "L");
+    u8g2.sendBuffer();
+  } else {
+    clearLCD(dnx - 15, dny + 10 - 9, 5, 9);
+  }
+
+  if (rightValue == 1) {
+    clearLCD(dnx + 15, dny + 10 - 9, 5, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dnx + 15, dny + 10, "R");
+    u8g2.sendBuffer();
+  } else {
+    clearLCD(dnx + 15, dny + 10 - 9, 5, 9);
+  }
+
+  if (backwardValue == 1) {
+    clearLCD(dnx, dny + 20 - 9, 5, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dnx, dny + 20, "B");
+    u8g2.sendBuffer();
+  } else {
+    clearLCD(dnx, dny + 20 - 9, 5, 9);
+  }
+}
+///////////////////////////////////////////////////////////////
+void displayGPSStatus(uint8_t dgx, uint8_t dgy) {
+  if (gpsValue == 1) {
+    clearLCD(dgx, dgy - 9, 50, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dgx, dgy, "GPS=ON");
+    u8g2.sendBuffer();
+  } else {
+    clearLCD(dgx, dgy - 9, 50, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dgx, dgy, "GPS=OFF");
+    u8g2.sendBuffer();
+  }
 }
 ///////////////////////////////////////////////////////////////
 void loop1(void * parameter) {
 
   for (;;) {
-    u8g2.drawFrame(0, 0, 80, 64);
-    u8g2.drawFrame(81, 0, 47, 64);
-
+    drawLayout();
     if (WiFi.status() == WL_CONNECTED && firebaseStatus == "ok") {
       showLedStatus(0, 255, 0);
       printSSID(2, 10);
       wifiSignalQuality(55, 10);
       batteryVoltage(2, 20);
       batteryPercent(55, 20);
+      displayThrottle(85, 10);
+      displayHorn(85, 20);
+      displayHeadlight(110, 20);
+      displayNav(100, 40);
+      displayGPSStatus(2, 30);
 
     }
 

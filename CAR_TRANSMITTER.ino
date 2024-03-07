@@ -58,7 +58,9 @@ int signalQuality[] = {99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
                        17, 15, 13, 10, 8, 6, 3, 1, 1, 1, 1, 1, 1, 1, 1
                       };
 uint8_t wifiRSSI = 0;
-uint8_t batteryLevel;
+float batteryLevel = 11.2;
+float blc = 11.1;
+float bhc = 12.5;
 uint8_t throttleValue;
 uint8_t forwardValue;
 uint8_t backwardValue;
@@ -114,8 +116,8 @@ void setup() {
   connectWiFi();
   delay(1000);
   connectFirebase();
-  delay(1000);
-  //  u8g2.clearDisplay();
+  delay(2000);
+  u8g2.clearDisplay();
 
   variableMutex = xSemaphoreCreateMutex();
   xTaskCreatePinnedToCore(
@@ -355,7 +357,7 @@ void wifiSignalQuality(uint8_t sqx, uint8_t sqy) {
 
   strcat(str, str2);
 
-  clearLCD(sqx, sqy - 10, 20, 10);
+  clearLCD(sqx, sqy - 9, 20, 9);
 
   u8g2.setFont(u8g2_font_t0_11_tr);
   u8g2.drawStr(sqx, sqy, str);
@@ -403,7 +405,7 @@ void decodeData(String data) {
   */
 
 
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<385> doc;
   DeserializationError error = deserializeJson(doc, data);
 
   if (error) {
@@ -413,7 +415,9 @@ void decodeData(String data) {
   }
 
   batteryLevel = doc["BATTERY"];
-  throttleValue = doc["SPEED"];
+  throttleValue = doc["THROTTLE"];
+  blc = doc["BLC"];
+  bhc = doc["BHC"];
   //  Serial.println(batteryLevel);
 
 
@@ -528,7 +532,7 @@ void speedControll() {
   //  Serial.println(mappedValue);
 
   if (abs(throttleValue - mappedValue) > 2) {
-    Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", mappedValue);
+    Firebase.setInt(firebaseData, "/ESP-CAR/THROTTLE", mappedValue);
   }
 }
 /////////////////////////////////////////////////////////////
@@ -536,7 +540,7 @@ void speedUpload() {
   if (xSemaphoreTake(variableMutex, portMAX_DELAY)) {
     throttleValue = sharedVarForSpeed;
     xSemaphoreGive(variableMutex);
-    Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", throttleValue);
+    Firebase.setInt(firebaseData, "/ESP-CAR/THROTTLE", throttleValue);
   }
 }
 //////////////////////////////////////////////////////////////
@@ -550,12 +554,57 @@ void updateFirebase() {
   Firebase.setInt(firebaseData, "/ESP-CAR/SPEED", throttleValue);
 }
 ///////////////////////////////////////////////////////////////
+void printSSID(uint8_t ssidx, uint8_t ssidy) {
+  if (strlen(ssid.c_str()) > 6) {
+    String shortSSID = ssid.substring(0, 7);
+    String wifiName = shortSSID + "..";
+    clearLCD(ssidx, ssidy - 9, 54, 9);
+
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(ssidx, ssidy, wifiName.c_str()); //c_str() function used for convert string to const char *
+    u8g2.sendBuffer();
+  } else {
+    String wifiName = ssid;
+    clearLCD(ssidx, ssidy - 9, 54, 9);
+
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(ssidx, ssidy, wifiName.c_str()); //c_str() function used for convert string to const char *
+    u8g2.sendBuffer();
+  }
+}
+///////////////////////////////////////////////////////////////
+void batteryVoltage(uint8_t bvx, uint8_t bvy) {
+  String level = String(batteryLevel, 2);
+  String inUnit = "B=" + level + "V";
+  clearLCD(bvx, bvy - 9, 54, 9);
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(bvx, bvy, inUnit.c_str()); //c_str() function used for convert string to const char *
+  u8g2.sendBuffer();
+}
+///////////////////////////////////////////////////////////////
+void batteryPercent(uint8_t bpx, uint8_t bpy){
+  float batteryFactor = 99/(bhc-blc);
+  int bat = (batteryLevel - blc)*batteryFactor;
+  String percentStr = String(bat);
+  String percent = percentStr + "%";
+  clearLCD(bpx, bpy - 9, 20, 9);
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(bpx, bpy, percent.c_str()); //c_str() function used for convert string to const char *
+  u8g2.sendBuffer();
+}
+///////////////////////////////////////////////////////////////
 void loop1(void * parameter) {
 
   for (;;) {
+    u8g2.drawFrame(0, 0, 80, 64);
+    u8g2.drawFrame(81, 0, 47, 64);
 
     if (WiFi.status() == WL_CONNECTED && firebaseStatus == "ok") {
       showLedStatus(0, 255, 0);
+      printSSID(2, 10);
+      wifiSignalQuality(55, 10);
+      batteryVoltage(2, 20);
+      batteryPercent(55, 20);
 
     }
 

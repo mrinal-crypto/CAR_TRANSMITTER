@@ -560,8 +560,9 @@ void speedUpload() {
 void drawLayout() {
   u8g2.drawFrame(0, 0, 80, 64);
   u8g2.drawFrame(81, 0, 47, 64);
-  u8g2.drawLine(93, 46, 112, 46);
-  u8g2.drawLine(102, 42, 102, 50);
+  u8g2.drawLine(82, 24, 126, 24);
+  u8g2.drawLine(93, 44, 115, 44);
+  u8g2.drawLine(104, 38, 104, 50);
   u8g2.sendBuffer();
 }
 ///////////////////////////////////////////////////////////////
@@ -608,7 +609,7 @@ void displayThrottle(uint8_t tvx, uint8_t tvy) {
   uint8_t pot = map(analogRead(THROTTLE), 0, 4095, 0, 100);
   String potStr = String(pot);
   String potPercent = "TH=" + potStr + "%";
-  clearLCD(tvx, tvy - 9, 44, 9);
+  clearLCD(tvx, tvy - 9, 42, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
   u8g2.drawStr(tvx, tvy, potPercent.c_str());
   u8g2.sendBuffer();
@@ -616,29 +617,29 @@ void displayThrottle(uint8_t tvx, uint8_t tvy) {
 ///////////////////////////////////////////////////////////////
 void displayHorn(uint8_t dhx, uint8_t dhy) {
   if (hornValue == 1) {
-    clearLCD(dhx, dhy - 9, 14, 9);
+    clearLCD(dhx, dhy - 9, 12, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
     u8g2.drawStr(dhx, dhy, "HR");
     u8g2.sendBuffer();
   } else {
-    clearLCD(dhx, dhy - 9, 14, 9);
+    clearLCD(dhx, dhy - 9, 12, 9);
   }
 }
 ///////////////////////////////////////////////////////////////
 void displayHeadlight(uint8_t dhdx, uint8_t dhdy) {
   if (headlightValue == 1) {
-    clearLCD(dhdx, dhdy - 9, 14, 9);
+    clearLCD(dhdx, dhdy - 9, 12, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
     u8g2.drawStr(dhdx, dhdy, "HL");
     u8g2.sendBuffer();
   } else {
-    clearLCD(dhdx, dhdy - 9, 14, 9);
+    clearLCD(dhdx, dhdy - 9, 12, 9);
   }
 }
 ///////////////////////////////////////////////////////////////
 void displayNav(uint8_t dnx, uint8_t dny) {
   if (forwardValue == 1) {
-    clearLCD(dnx, dny - 9, 5, 9);
+    clearLCD(dnx, dny - 9, 6, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
     u8g2.drawStr(dnx, dny, "F");
     u8g2.sendBuffer();
@@ -647,30 +648,30 @@ void displayNav(uint8_t dnx, uint8_t dny) {
   }
 
   if (leftValue == 1) {
-    clearLCD(dnx - 15, dny + 10 - 9, 5, 9);
+    clearLCD(dnx - 17, dny + 13 - 9, 6, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(dnx - 15, dny + 10, "L");
+    u8g2.drawStr(dnx - 17, dny + 13, "L");
     u8g2.sendBuffer();
   } else {
-    clearLCD(dnx - 15, dny + 10 - 9, 5, 9);
+    clearLCD(dnx - 17, dny + 13 - 9, 6, 9);
   }
 
   if (rightValue == 1) {
-    clearLCD(dnx + 15, dny + 10 - 9, 5, 9);
+    clearLCD(dnx + 16, dny + 13 - 9, 6, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(dnx + 15, dny + 10, "R");
+    u8g2.drawStr(dnx + 16, dny + 13, "R");
     u8g2.sendBuffer();
   } else {
-    clearLCD(dnx + 15, dny + 10 - 9, 5, 9);
+    clearLCD(dnx + 16, dny + 13 - 9, 6, 9);
   }
 
   if (backwardValue == 1) {
-    clearLCD(dnx, dny + 20 - 9, 5, 9);
+    clearLCD(dnx, dny + 25 - 9, 6, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(dnx, dny + 20, "B");
+    u8g2.drawStr(dnx, dny + 25, "B");
     u8g2.sendBuffer();
   } else {
-    clearLCD(dnx, dny + 20 - 9, 5, 9);
+    clearLCD(dnx, dny + 25 - 9, 6, 9);
   }
 }
 ///////////////////////////////////////////////////////////////
@@ -725,10 +726,10 @@ void loop1(void * parameter) {
       wifiSignalQuality(55, 10);
       batteryVoltage(2, 20);
       batteryPercent(55, 20);
-      displayThrottle(83, 10);
-      displayHorn(85, 20);
-      displayHeadlight(110, 20);
-      displayNav(100, 40);
+      displayThrottle(83, 11);
+      displayHorn(86, 22);
+      displayHeadlight(112, 22);
+      displayNav(102, 36);
       displayGPSStatus(2, 30);
       displayLatLng(2, 40);
       displayCarSpeed(2, 60);

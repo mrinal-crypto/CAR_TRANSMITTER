@@ -35,21 +35,9 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 unsigned long previousMillis = 0;
 const unsigned long interval = 50;
 
-const int portalOpenTime = 300000; //server open for 5 mins
-bool onDemand;
 
-
-String firebaseStatus = "";
-String ssid = "";
 volatile uint8_t sharedVarForSpeed;
 volatile uint16_t sharedVarForTime = 0;
-
-
-
-
-const char* switch2;
-const char* switch3;
-const char* switch4;
 
 int signalQuality[] = {99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
                        99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 98, 98, 98, 97, 97, 96, 96, 95, 95, 94, 93, 93, 92,
@@ -57,10 +45,18 @@ int signalQuality[] = {99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
                        63, 61, 60, 58, 56, 55, 53, 51, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20,
                        17, 15, 13, 10, 8, 6, 3, 1, 1, 1, 1, 1, 1, 1, 1
                       };
-uint8_t wifiRSSI = 0;
+
+const int portalOpenTime = 300000; //server open for 5 mins
+bool onDemand;
+String firebaseStatus = "";
+String ssid = "";
 float batteryLevel = 11.2;
 float blc = 11.1;
 float bhc = 12.5;
+float latti = 00.00000;
+float longi = 00.00000;
+float carSpeed = 00.00;
+uint8_t wifiRSSI = 0;
 uint8_t throttleValue;
 uint8_t potValue;
 uint8_t forwardValue;
@@ -140,8 +136,9 @@ void welcomeMsg() {
 
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_luBIS18_tr);
-  u8g2.drawStr(7, 35, "ESP CAR");
+  u8g2.drawStr(7, 30, "ESP CAR");
   u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(29, 43, "TRANSMITTER");
   u8g2.drawStr(2, 60, "developed by M.Maity");
   u8g2.sendBuffer();
   u8g2.clearBuffer();
@@ -427,9 +424,15 @@ void decodeData(String data) {
   gpsValue = doc["GPS"];
   headlightValue = doc["HL"];
   hornValue = doc["HORN"];
+  latti = doc["LAT"];
   leftValue = doc["LEFT"];
+  longi = doc["LNG"];
   rightValue = doc["RIGHT"];
+  carSpeed = doc["SPEED"];
   throttleValue = doc["THROTTLE"];
+
+
+
 
   //  Serial.println(batteryLevel);
 
@@ -604,8 +607,8 @@ void batteryPercent(uint8_t bpx, uint8_t bpy) {
 void displayThrottle(uint8_t tvx, uint8_t tvy) {
   uint8_t pot = map(analogRead(THROTTLE), 0, 4095, 0, 100);
   String potStr = String(pot);
-  String potPercent = "T=" + potStr + "%";
-  clearLCD(tvx, tvy - 9, 42, 9);
+  String potPercent = "TH=" + potStr + "%";
+  clearLCD(tvx, tvy - 9, 44, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
   u8g2.drawStr(tvx, tvy, potPercent.c_str());
   u8g2.sendBuffer();
@@ -685,6 +688,33 @@ void displayGPSStatus(uint8_t dgx, uint8_t dgy) {
   }
 }
 ///////////////////////////////////////////////////////////////
+void displayLatLng(uint8_t dllx, uint8_t dlly) {
+
+  String latStr = String(latti, 5);
+  String lngStr = String(longi, 5);
+  String latStr2 = "LAT=" + latStr;
+  String lngStr2 = "LNG=" + lngStr;
+
+  clearLCD(dllx, dlly - 9, 77, 9);
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(dllx, dlly, latStr2.c_str());
+  
+  clearLCD(dllx, dlly + 10 - 9, 77, 9);
+  u8g2.drawStr(dllx, dlly + 10, lngStr2.c_str());
+  u8g2.sendBuffer();
+}
+///////////////////////////////////////////////////////////////
+void displayCarSpeed(uint8_t dcsx, uint8_t dcsy) {
+
+  String speedStr = String(carSpeed, 3);
+  String speedStr2 = "KMPH=" + speedStr;
+  
+  clearLCD(dcsx, dcsy - 9, 77, 9);
+  u8g2.setFont(u8g2_font_t0_11_tr);
+  u8g2.drawStr(dcsx, dcsy, speedStr2.c_str());
+  u8g2.sendBuffer();
+}
+///////////////////////////////////////////////////////////////
 void loop1(void * parameter) {
 
   for (;;) {
@@ -695,11 +725,13 @@ void loop1(void * parameter) {
       wifiSignalQuality(55, 10);
       batteryVoltage(2, 20);
       batteryPercent(55, 20);
-      displayThrottle(85, 10);
+      displayThrottle(83, 10);
       displayHorn(85, 20);
       displayHeadlight(110, 20);
       displayNav(100, 40);
       displayGPSStatus(2, 30);
+      displayLatLng(2, 40);
+      displayCarSpeed(2, 60);
 
     }
 

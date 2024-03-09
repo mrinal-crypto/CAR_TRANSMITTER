@@ -27,6 +27,7 @@
 #define LEFT 18
 #define RIGHT 19
 #define HORN 4
+#define GPS_POWER 35
 
 CRGB leds[NUM_LEDS];
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
@@ -90,6 +91,7 @@ void setup() {
   pinMode(LEFT, INPUT);
   pinMode(RIGHT, INPUT);
   pinMode(HORN, INPUT);
+  pinMode(GPS_POWER, INPUT);
   delay(500);
 
   if (SPIFFS.begin(true)) {
@@ -498,43 +500,83 @@ void loading()
   }
 }
 
-void navigation() {
-  uint8_t f = digitalRead(FORWARD);
-  uint8_t b = digitalRead(BACKWARD);
-  uint8_t l = digitalRead(LEFT);
-  uint8_t r = digitalRead(RIGHT);
-  uint8_t h = digitalRead(HORN);
-
-  if (f == HIGH && b == LOW && l == LOW && r == LOW) {
-    Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 1);
-  } else {
-    Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 0);
+//////////////////////////////////////////////////////////////
+void gpsPowerControll(){
+  if(digitalRead(GPS_POWER) == HIGH){
+    Firebase.setInt(firebaseData, "/ESP-CAR/GPS", 1);
+  }else{
+    Firebase.setInt(firebaseData, "/ESP-CAR/GPS", 0);
+    Firebase.setFloat(firebaseData, "/ESP-CAR/LAT", 00.0000);
+    Firebase.setFloat(firebaseData, "/ESP-CAR/LNG", 00.0000);
+    Firebase.setFloat(firebaseData, "/ESP-CAR/SPEED", 00.000);
   }
+}
+/////////////////////////////////////////////////////////////
+void navigation() {
 
-  if (b == HIGH && f == LOW && l == LOW && r == LOW) {
-    Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", 1);
+  if ((digitalRead(FORWARD) == HIGH) ^
+      (digitalRead(BACKWARD) == HIGH) ^
+      (digitalRead(LEFT) == HIGH) ^
+      (digitalRead(RIGHT) == HIGH)) {
+
+    if (digitalRead(FORWARD) == HIGH) {
+      Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 1);
+    } else if (digitalRead(BACKWARD) == HIGH) {
+      Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", 1);
+    } else if (digitalRead(LEFT) == HIGH) {
+      Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", 1);
+    } else if (digitalRead(RIGHT) == HIGH) {
+      Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", 1);
+    }
   } else {
     Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", 0);
-  }
-
-  if (l == HIGH && f == LOW && b == LOW && r == LOW) {
-    Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", 1);
-  } else {
+    Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 0);
     Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", 0);
-  }
-
-  if (r == HIGH && f == LOW && b == LOW && l == LOW) {
-    Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", 1);
-  } else {
     Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", 0);
   }
 
   if (digitalRead(HORN) == HIGH) {
     Firebase.setInt(firebaseData, "/ESP-CAR/HORN", 1);
-  }
-  else {
+  } else {
     Firebase.setInt(firebaseData, "/ESP-CAR/HORN", 0);
   }
+
+  //  uint8_t f = digitalRead(FORWARD);
+  //  uint8_t b = digitalRead(BACKWARD);
+  //  uint8_t l = digitalRead(LEFT);
+  //  uint8_t r = digitalRead(RIGHT);
+  //  uint8_t h = digitalRead(HORN);
+  //
+  //  if (f == HIGH && b == LOW && l == LOW && r == LOW) {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 1);
+  //  } else {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 0);
+  //  }
+  //
+  //  if (b == HIGH && f == LOW && l == LOW && r == LOW) {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", 1);
+  //  } else {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/BACKWARD", 0);
+  //  }
+  //
+  //  if (l == HIGH && f == LOW && b == LOW && r == LOW) {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", 1);
+  //  } else {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/LEFT", 0);
+  //  }
+  //
+  //  if (r == HIGH && f == LOW && b == LOW && l == LOW) {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", 1);
+  //  } else {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/RIGHT", 0);
+  //  }
+  //
+  //  if (digitalRead(HORN) == HIGH) {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/HORN", 1);
+  //  }
+  //  else {
+  //    Firebase.setInt(firebaseData, "/ESP-CAR/HORN", 0);
+  //  }
 }
 ///////////////////////////////////////////////////////////////
 void speedControll() {
@@ -691,15 +733,15 @@ void displayGPSStatus(uint8_t dgx, uint8_t dgy) {
 ///////////////////////////////////////////////////////////////
 void displayLatLng(uint8_t dllx, uint8_t dlly) {
 
-  String latStr = String(latti, 5);
-  String lngStr = String(longi, 5);
+  String latStr = String(latti, 4);
+  String lngStr = String(longi, 4);
   String latStr2 = "LAT=" + latStr;
   String lngStr2 = "LNG=" + lngStr;
 
   clearLCD(dllx, dlly - 9, 77, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
   u8g2.drawStr(dllx, dlly, latStr2.c_str());
-  
+
   clearLCD(dllx, dlly + 10 - 9, 77, 9);
   u8g2.drawStr(dllx, dlly + 10, lngStr2.c_str());
   u8g2.sendBuffer();
@@ -709,12 +751,13 @@ void displayCarSpeed(uint8_t dcsx, uint8_t dcsy) {
 
   String speedStr = String(carSpeed, 3);
   String speedStr2 = "KMPH=" + speedStr;
-  
+
   clearLCD(dcsx, dcsy - 9, 77, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
   u8g2.drawStr(dcsx, dcsy, speedStr2.c_str());
   u8g2.sendBuffer();
 }
+
 ///////////////////////////////////////////////////////////////
 void loop1(void * parameter) {
 
@@ -757,6 +800,7 @@ void loop() {
   if (firebaseStatus == "ok") {
     navigation();
     speedControll();
+    gpsPowerControll();
     Firebase.getString(firebaseData, "/ESP-CAR");
     decodeData(firebaseData.stringData());
   }

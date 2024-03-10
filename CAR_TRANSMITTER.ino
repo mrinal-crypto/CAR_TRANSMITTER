@@ -32,10 +32,8 @@
 CRGB leds[NUM_LEDS];
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
-
 unsigned long previousMillis = 0;
 const unsigned long interval = 50;
-
 
 volatile uint8_t sharedVarForSpeed;
 volatile uint16_t sharedVarForTime = 0;
@@ -66,6 +64,7 @@ uint8_t leftValue;
 uint8_t rightValue;
 uint8_t hornValue;
 uint8_t headlightValue;
+uint8_t satNo;
 uint8_t gpsValue;
 
 FirebaseData firebaseData;
@@ -201,8 +200,7 @@ void connectFirebase() {
   }
 
 }
-
-
+//////////////////////////////////////////////////////////////////
 void setupServer() {
   preferences.begin("my-app", false);
 
@@ -397,9 +395,7 @@ void onDemandFirebaseConfig() {
 }
 
 void decodeData(String data) {
-
   Serial.println(data); //For Example=> {"value1":"\"on\"","value2":"\"on\"","value3":"\"off\"","value4":"\"off\""}
-
   /*
       goto website https://arduinojson.org/v6/assistant/#/step1
       select board
@@ -407,8 +403,6 @@ void decodeData(String data) {
       and paste your JSON data
       it automatically generate your code
   */
-
-
   StaticJsonDocument<385> doc;
   DeserializationError error = deserializeJson(doc, data);
 
@@ -417,7 +411,6 @@ void decodeData(String data) {
     Serial.println(error.f_str());
     return;
   }
-
   backwardValue = doc["BACKWARD"];
   batteryLevel = doc["BATTERY"];
   bhc = doc["BHC"];
@@ -430,16 +423,11 @@ void decodeData(String data) {
   leftValue = doc["LEFT"];
   longi = doc["LNG"];
   rightValue = doc["RIGHT"];
+  satNo = doc["SAT"];
   carSpeed = doc["SPEED"];
   throttleValue = doc["THROTTLE"];
-
-
-
-
-  //  Serial.println(batteryLevel);
-
 }
-
+////////////////////////////////////////////////////////////////
 boolean isFirebaseConnected() {
   Firebase.getString(firebaseData, "/ESP-CAR");
   if (firebaseData.stringData() != "") {
@@ -449,16 +437,12 @@ boolean isFirebaseConnected() {
     return false;
   }
 }
-
-
 //////////////////////////////////////////////////////////////
 void showLedStatus(uint8_t r, uint8_t g, uint8_t b ) {
   leds[STATUS_LED] = CRGB(r, g, b);;
   FastLED.show();
 }
-
 ///////////////////////////////////////////////////////////////
-
 void loading()
 {
   static uint16_t sPseudotime = 0;
@@ -501,13 +485,12 @@ void loading()
 }
 
 //////////////////////////////////////////////////////////////
-void gpsPowerControll(){
-  if(digitalRead(GPS_POWER) == HIGH){
+void gpsPowerControll() {
+  if (digitalRead(GPS_POWER) == HIGH) {
     Firebase.setInt(firebaseData, "/ESP-CAR/GPS", 1);
-  }else{
+  } else {
     Firebase.setInt(firebaseData, "/ESP-CAR/GPS", 0);
-    Firebase.setFloat(firebaseData, "/ESP-CAR/LAT", 00.0000);
-    Firebase.setFloat(firebaseData, "/ESP-CAR/LNG", 00.0000);
+    Firebase.setInt(firebaseData, "/ESP-CAR/SAT", 0);
     Firebase.setFloat(firebaseData, "/ESP-CAR/SPEED", 00.000);
   }
 }
@@ -723,8 +706,15 @@ void displayGPSStatus(uint8_t dgx, uint8_t dgy) {
     u8g2.setFont(u8g2_font_t0_11_tr);
     u8g2.drawStr(dgx, dgy, "GPS=ON");
     u8g2.sendBuffer();
+
+    String satStr = String(satNo);
+    clearLCD(dgx + 53, dgy - 9, 20, 9);
+    u8g2.setFont(u8g2_font_t0_11_tr);
+    u8g2.drawStr(dgx + 53, dgy, satStr.c_str());
+    u8g2.sendBuffer();
+
   } else {
-    clearLCD(dgx, dgy - 9, 50, 9);
+    clearLCD(dgx, dgy - 9, 77, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
     u8g2.drawStr(dgx, dgy, "GPS=OFF");
     u8g2.sendBuffer();
@@ -808,12 +798,10 @@ void loop() {
     Serial.println("firebase failed");
   }
 
-
   if (firebaseStatus != "ok") {
     if (WiFi.status() == WL_CONNECTED) {
       Firebase.getString(firebaseData, "/ESP-CAR");
       decodeData(firebaseData.stringData());
     }
   }
-
 }

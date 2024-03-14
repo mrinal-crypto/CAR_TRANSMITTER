@@ -49,6 +49,8 @@ const int portalOpenTime = 300000; //server open for 5 mins
 bool onDemand;
 String firebaseStatus = "";
 String ssid = "";
+String concatenatedDMSLat = "";
+String concatenatedDMSLng = "";
 float batteryLevel = 11.2;
 float blc = 11.1;
 float bhc = 12.5;
@@ -411,6 +413,7 @@ void decodeData(String data) {
     Serial.println(error.f_str());
     return;
   }
+
   backwardValue = doc["BACKWARD"];
   batteryLevel = doc["BATTERY"];
   bhc = doc["BHC"];
@@ -722,24 +725,47 @@ void displayGPSStatus(uint8_t dgx, uint8_t dgy) {
 }
 ///////////////////////////////////////////////////////////////
 void displayLatLng(uint8_t dllx, uint8_t dlly) {
-
-  String latStr = String(latti, 4);
-  String lngStr = String(longi, 4);
-  String latStr2 = "LAT=" + latStr;
-  String lngStr2 = "LNG=" + lngStr;
-
+  concatenatedDMSLat = "";
+  concatenatedDMSLng = "";
+  
+  convertToDMS(latti, 'N', 'S', concatenatedDMSLat);
+  convertToDMS(longi, 'E', 'W', concatenatedDMSLng);
+  
   clearLCD(dllx, dlly - 9, 77, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
-  u8g2.drawStr(dllx, dlly, latStr2.c_str());
+  u8g2.drawStr(dllx, dlly, concatenatedDMSLat.c_str());
 
   clearLCD(dllx, dlly + 10 - 9, 77, 9);
-  u8g2.drawStr(dllx, dlly + 10, lngStr2.c_str());
+  u8g2.drawStr(dllx, dlly + 10, concatenatedDMSLng.c_str());
   u8g2.sendBuffer();
+
+
+  //  String latStr = String(latti, 4);
+  //  String lngStr = String(longi, 4);
+  //  String latStr2 = "LAT=" + latStr;
+  //  String lngStr2 = "LNG=" + lngStr;
+  //
+  //  clearLCD(dllx, dlly - 9, 77, 9);
+  //  u8g2.setFont(u8g2_font_t0_11_tr);
+  //  u8g2.drawStr(dllx, dlly, latStr2.c_str());
+  //
+  //  clearLCD(dllx, dlly + 10 - 9, 77, 9);
+  //  u8g2.drawStr(dllx, dlly + 10, lngStr2.c_str());
+  //  u8g2.sendBuffer();
+}
+//////////////////////////////////////////////////////////////
+void convertToDMS(double value, char positiveDirection, char negativeDirection, String &resultString) {
+  char direction = (value >= 0) ? positiveDirection : negativeDirection;
+  value = fabs(value);
+  int degrees = static_cast<int>(value);
+  double minutes = (value - degrees) * 60.0;
+  double seconds = (minutes - static_cast<int>(minutes)) * 60.0;
+  resultString += String(degrees) + "." + String(static_cast<int>(minutes)) + "'" + String(seconds, 0) + "\"" + direction;
 }
 ///////////////////////////////////////////////////////////////
 void displayCarSpeed(uint8_t dcsx, uint8_t dcsy) {
 
-  String speedStr = String(carSpeed, 3);
+  String speedStr = String(carSpeed, 2);
   String speedStr2 = "KMPH=" + speedStr;
 
   clearLCD(dcsx, dcsy - 9, 77, 9);

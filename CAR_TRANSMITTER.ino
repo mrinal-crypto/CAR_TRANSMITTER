@@ -38,21 +38,20 @@ const unsigned long interval = 50;
 volatile uint8_t sharedVarForSpeed;
 volatile uint16_t sharedVarForTime = 0;
 
-int signalQuality[] = {99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
-                       99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 98, 98, 98, 97, 97, 96, 96, 95, 95, 94, 93, 93, 92,
-                       91, 90, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80, 79, 78, 76, 75, 74, 73, 71, 70, 69, 67, 66, 64,
-                       63, 61, 60, 58, 56, 55, 53, 51, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20,
-                       17, 15, 13, 10, 8, 6, 3, 1, 1, 1, 1, 1, 1, 1, 1
-                      };
+int signalQuality[] = { 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99,
+                        99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 98, 98, 98, 97, 97, 96, 96, 95, 95, 94, 93, 93, 92,
+                        91, 90, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80, 79, 78, 76, 75, 74, 73, 71, 70, 69, 67, 66, 64,
+                        63, 61, 60, 58, 56, 55, 53, 51, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20,
+                        17, 15, 13, 10, 8, 6, 3, 1, 1, 1, 1, 1, 1, 1, 1 };
 
-const int portalOpenTime = 300000; //server open for 5 mins
+const int portalOpenTime = 300000;  //server open for 5 mins
 bool onDemand;
 String firebaseStatus = "";
 String ssid = "";
 String concatenatedDMSLat = "";
 String concatenatedDMSLng = "";
-float batteryLevel = 11.2;
-float blc = 11.1;
+float batteryLevel = 11.99;
+float blc = 11.99;
 float bhc = 12.5;
 float latti = 00.00000;
 float longi = 00.00000;
@@ -70,6 +69,9 @@ uint8_t satNo;
 uint8_t gpsValue;
 
 FirebaseData firebaseData;
+FirebaseAuth auth;
+FirebaseConfig config;
+
 AsyncWebServer server(80);
 Preferences preferences;
 
@@ -145,7 +147,6 @@ void welcomeMsg() {
   u8g2.drawStr(2, 60, "developed by M.Maity");
   u8g2.sendBuffer();
   u8g2.clearBuffer();
-
 }
 ////////////////////////////////////////////////////////////////////////
 void clearLCD(const long x, uint8_t y, uint8_t wid, uint8_t hig) {
@@ -169,8 +170,15 @@ void connectFirebase() {
     u8g2.sendBuffer();
     delay(500);
 
-    Firebase.begin(preferences.getString("firebaseUrl", ""), preferences.getString("firebaseToken", ""));
+    String firebaseUrl = preferences.getString("firebaseUrl", "");
+    String firebaseToken = preferences.getString("firebaseToken", "");
+    config.database_url = firebaseUrl;
+    config.api_key = firebaseToken;
+    Firebase.signUp(&config, &auth, "", "");  //for anonymous user
     delay(100);
+    Firebase.begin(&config, &auth);
+    delay(100);
+
     Firebase.reconnectWiFi(true);
     delay(100);
 
@@ -200,26 +208,29 @@ void connectFirebase() {
     delay(500);
     setupServer();
   }
-
 }
 //////////////////////////////////////////////////////////////////
 void setupServer() {
   preferences.begin("my-app", false);
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SPIFFS, "/index.html", String(), false);
   });
 
-  server.on("/Submit", HTTP_POST, [](AsyncWebServerRequest * request) {
-
+  server.on("/Submit", HTTP_POST, [](AsyncWebServerRequest *request) {
     String firebaseUrl = request->arg("url");
     String firebaseToken = request->arg("token");
 
     preferences.putString("firebaseUrl", firebaseUrl);
     preferences.putString("firebaseToken", firebaseToken);
 
-    Firebase.begin(firebaseUrl, firebaseToken);
+    config.database_url = firebaseUrl;
+    config.api_key = firebaseToken;
+    Firebase.signUp(&config, &auth, "", "");  //for anonymous user
     delay(100);
+    Firebase.begin(&config, &auth);
+    delay(100);
+
     Firebase.reconnectWiFi(true);
     delay(100);
 
@@ -287,16 +298,15 @@ void setupServer() {
 //////////////////////////////////////////////////////////////////////////////
 void ipCheck(uint8_t ipx, uint8_t ipy) {
 
-  String rawIP = WiFi.localIP().toString(); //toString () used for convert char to string
+  String rawIP = WiFi.localIP().toString();  //toString () used for convert char to string
 
   String IPAdd = "IP " + rawIP;
 
   clearLCD(ipx, ipy - 10, 98, 10);
 
   u8g2.setFont(u8g2_font_t0_11_tr);
-  u8g2.drawStr(ipx, ipy, IPAdd.c_str()); //c_str() function used for convert string to const char *
+  u8g2.drawStr(ipx, ipy, IPAdd.c_str());  //c_str() function used for convert string to const char *
   u8g2.sendBuffer();
-
 }
 //////////////////////////////////////////////////////////////////////////////
 void connectWiFi() {
@@ -372,13 +382,11 @@ void tostring(char str[], int num) {
   int i, rem, len = 0, n;
 
   n = num;
-  while (n != 0)
-  {
+  while (n != 0) {
     len++;
     n /= 10;
   }
-  for (i = 0; i < len; i++)
-  {
+  for (i = 0; i < len; i++) {
     rem = num % 10;
     num = num / 10;
     str[len - (i + 1)] = rem + '0';
@@ -397,7 +405,7 @@ void onDemandFirebaseConfig() {
 }
 
 void decodeData(String data) {
-  Serial.println(data); //For Example=> {"value1":"\"on\"","value2":"\"on\"","value3":"\"off\"","value4":"\"off\""}
+  Serial.println(data);  //For Example=> {"value1":"\"on\"","value2":"\"on\"","value3":"\"off\"","value4":"\"off\""}
   /*
       goto website https://arduinojson.org/v6/assistant/#/step1
       select board
@@ -435,55 +443,54 @@ boolean isFirebaseConnected() {
   Firebase.getString(firebaseData, "/ESP-CAR");
   if (firebaseData.stringData() != "") {
     return true;
-  }
-  else {
+  } else {
     return false;
   }
 }
 //////////////////////////////////////////////////////////////
-void showLedStatus(uint8_t r, uint8_t g, uint8_t b ) {
-  leds[STATUS_LED] = CRGB(r, g, b);;
+void showLedStatus(uint8_t r, uint8_t g, uint8_t b) {
+  leds[STATUS_LED] = CRGB(r, g, b);
+  ;
   FastLED.show();
 }
 ///////////////////////////////////////////////////////////////
-void loading()
-{
+void loading() {
   static uint16_t sPseudotime = 0;
   static uint16_t sLastMillis = 0;
   static uint16_t sHue16 = 0;
 
-  uint8_t sat8 = beatsin88( 87, 220, 250);
-  uint8_t brightdepth = beatsin88( 341, 96, 224);
-  uint16_t brightnessthetainc16 = beatsin88( 203, (25 * 256), (40 * 256));
+  uint8_t sat8 = beatsin88(87, 220, 250);
+  uint8_t brightdepth = beatsin88(341, 96, 224);
+  uint16_t brightnessthetainc16 = beatsin88(203, (25 * 256), (40 * 256));
   uint8_t msmultiplier = beatsin88(147, 23, 60);
 
-  uint16_t hue16 = sHue16;//gHue * 256;
+  uint16_t hue16 = sHue16;  //gHue * 256;
   uint16_t hueinc16 = beatsin88(113, 1, 3000);
 
   uint16_t ms = millis();
-  uint16_t deltams = ms - sLastMillis ;
-  sLastMillis  = ms;
+  uint16_t deltams = ms - sLastMillis;
+  sLastMillis = ms;
   sPseudotime += deltams * msmultiplier;
-  sHue16 += deltams * beatsin88( 400, 5, 9);
+  sHue16 += deltams * beatsin88(400, 5, 9);
   uint16_t brightnesstheta16 = sPseudotime;
 
-  for ( uint16_t i = 0 ; i < NUM_LEDS; i++) {
+  for (uint16_t i = 0; i < NUM_LEDS; i++) {
     hue16 += hueinc16;
     uint8_t hue8 = hue16 / 256;
 
-    brightnesstheta16  += brightnessthetainc16;
-    uint16_t b16 = sin16( brightnesstheta16  ) + 32768;
+    brightnesstheta16 += brightnessthetainc16;
+    uint16_t b16 = sin16(brightnesstheta16) + 32768;
 
     uint16_t bri16 = (uint32_t)((uint32_t)b16 * (uint32_t)b16) / 65536;
     uint8_t bri8 = (uint32_t)(((uint32_t)bri16) * brightdepth) / 65536;
     bri8 += (255 - brightdepth);
 
-    CRGB newcolor = CHSV( hue8, sat8, bri8);
+    CRGB newcolor = CHSV(hue8, sat8, bri8);
 
     uint16_t pixelnumber = i;
     pixelnumber = (NUM_LEDS - 1) - pixelnumber;
 
-    nblend( leds[pixelnumber], newcolor, 64);
+    nblend(leds[pixelnumber], newcolor, 64);
   }
 }
 
@@ -500,10 +507,7 @@ void gpsPowerControll() {
 /////////////////////////////////////////////////////////////
 void navigation() {
 
-  if ((digitalRead(FORWARD) == HIGH) ^
-      (digitalRead(BACKWARD) == HIGH) ^
-      (digitalRead(LEFT) == HIGH) ^
-      (digitalRead(RIGHT) == HIGH)) {
+  if ((digitalRead(FORWARD) == HIGH) ^ (digitalRead(BACKWARD) == HIGH) ^ (digitalRead(LEFT) == HIGH) ^ (digitalRead(RIGHT) == HIGH)) {
 
     if (digitalRead(FORWARD) == HIGH) {
       Firebase.setInt(firebaseData, "/ESP-CAR/FORWARD", 1);
@@ -601,24 +605,24 @@ void printSSID(uint8_t ssidx, uint8_t ssidy) {
     clearLCD(ssidx, ssidy - 9, 54, 9);
 
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(ssidx, ssidy, wifiName.c_str()); //c_str() function used for convert string to const char *
+    u8g2.drawStr(ssidx, ssidy, wifiName.c_str());  //c_str() function used for convert string to const char *
     u8g2.sendBuffer();
   } else {
     String wifiName = ssid;
     clearLCD(ssidx, ssidy - 9, 54, 9);
 
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(ssidx, ssidy, wifiName.c_str()); //c_str() function used for convert string to const char *
+    u8g2.drawStr(ssidx, ssidy, wifiName.c_str());  //c_str() function used for convert string to const char *
     u8g2.sendBuffer();
   }
 }
 ///////////////////////////////////////////////////////////////
 void batteryVoltage(uint8_t bvx, uint8_t bvy) {
-  String level = String(batteryLevel, 2);
+  String level = String(batteryLevel, 1);
   String inUnit = "B=" + level + "V";
   clearLCD(bvx, bvy - 9, 54, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
-  u8g2.drawStr(bvx, bvy, inUnit.c_str()); //c_str() function used for convert string to const char *
+  u8g2.drawStr(bvx, bvy, inUnit.c_str());  //c_str() function used for convert string to const char *
   u8g2.sendBuffer();
 }
 ///////////////////////////////////////////////////////////////
@@ -707,7 +711,7 @@ void displayGPSStatus(uint8_t dgx, uint8_t dgy) {
   if (gpsValue == 1) {
     clearLCD(dgx, dgy - 9, 50, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(dgx, dgy, "GPS=ON");
+    u8g2.drawStr(dgx, dgy, "GPS= ON");
     u8g2.sendBuffer();
 
     String satStr = String(satNo);
@@ -719,7 +723,7 @@ void displayGPSStatus(uint8_t dgx, uint8_t dgy) {
   } else {
     clearLCD(dgx, dgy - 9, 77, 9);
     u8g2.setFont(u8g2_font_t0_11_tr);
-    u8g2.drawStr(dgx, dgy, "GPS=OFF");
+    u8g2.drawStr(dgx, dgy, "GPS= OFF");
     u8g2.sendBuffer();
   }
 }
@@ -727,10 +731,10 @@ void displayGPSStatus(uint8_t dgx, uint8_t dgy) {
 void displayLatLng(uint8_t dllx, uint8_t dlly) {
   concatenatedDMSLat = "";
   concatenatedDMSLng = "";
-  
+
   convertToDMS(latti, 'N', 'S', concatenatedDMSLat);
   convertToDMS(longi, 'E', 'W', concatenatedDMSLng);
-  
+
   clearLCD(dllx, dlly - 9, 77, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
   u8g2.drawStr(dllx, dlly, concatenatedDMSLat.c_str());
@@ -765,8 +769,8 @@ void convertToDMS(double value, char positiveDirection, char negativeDirection, 
 ///////////////////////////////////////////////////////////////
 void displayCarSpeed(uint8_t dcsx, uint8_t dcsy) {
 
-  String speedStr = String(carSpeed, 2);
-  String speedStr2 = "KMPH=" + speedStr;
+  String speedStr = String(carSpeed, 1);
+  String speedStr2 = "MPS= " + speedStr;
 
   clearLCD(dcsx, dcsy - 9, 77, 9);
   u8g2.setFont(u8g2_font_t0_11_tr);
@@ -775,7 +779,7 @@ void displayCarSpeed(uint8_t dcsx, uint8_t dcsy) {
 }
 
 ///////////////////////////////////////////////////////////////
-void loop1(void * parameter) {
+void loop1(void *parameter) {
 
   for (;;) {
     drawLayout();
@@ -792,7 +796,6 @@ void loop1(void * parameter) {
       displayGPSStatus(2, 30);
       displayLatLng(2, 40);
       displayCarSpeed(2, 60);
-
     }
 
     if (onDemand == true) {
@@ -819,8 +822,7 @@ void loop() {
     gpsPowerControll();
     Firebase.getString(firebaseData, "/ESP-CAR");
     decodeData(firebaseData.stringData());
-  }
-  else {
+  } else {
     Serial.println("firebase failed");
   }
 
